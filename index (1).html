@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Study Board">
+<meta name="theme-color" content="#FCFBF8">
+<meta name="description" content="科目・単元でタグ付けして管理する学習メモアプリ">
+<title>Study Board</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FCFBF8;
+  --bg-dot:rgba(0,0,0,0.035);
+  --paper:#FFFFFF;
+  --paper-dim:#F3EFE6;
+  --ink:#2B2320;
+  --ink-soft:#8a7c6c;
+  --line:#00000014;
+  --subj-math:#DDF1FB;
+  --subj-english:#FFF6D6;
+  --subj-physics:#ECE3FB;
+  --subj-chem:#E3F6E6;
+  --subj-other:#FFFFFF;
+  --c-red:#FF8787;
+  --c-orange:#FFB86B;
+  --c-green:#8CE99A;
+  --shadow: rgba(60,45,25,0.14);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:'Noto Sans JP','Inter',sans-serif;
+  color:var(--ink);
+  background-color:var(--bg);
+  background-image: radial-gradient(var(--bg-dot) 1.3px, transparent 1.3px);
+  background-size:22px 22px;
+  overflow:hidden;
+  height:100vh;
+  height:100dvh;
+}
+#app{display:flex;flex-direction:column;height:100%;}
+
+/* ---------- Header ---------- */
+header{padding:14px 18px 6px;flex-shrink:0;}
+header h1{font-family:'Noto Sans JP',sans-serif;font-weight:900;font-size:22px;color:var(--ink);margin:0;letter-spacing:0.02em;}
+header p{margin:3px 0 0;font-size:12px;color:var(--ink-soft);}
+
+/* ---------- Controls ---------- */
+.controls{
+  display:flex;flex-wrap:nowrap;gap:8px;align-items:center;padding:8px 18px 12px;flex-shrink:0;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.controls::-webkit-scrollbar{display:none;}
+.pill-group{display:inline-flex;background:var(--paper-dim);border-radius:999px;padding:3px;gap:2px;flex-shrink:0;}
+.pill-group button{
+  border:none;background:transparent;color:var(--ink-soft);
+  font-size:13px;font-weight:700;padding:10px 15px;border-radius:999px;cursor:pointer;
+  font-family:'Noto Sans JP',sans-serif;white-space:nowrap;transition:background .15s,color .15s;
+  min-height:40px;touch-action:manipulation;
+}
+.pill-group button.active{background:var(--ink);color:#fff;}
+.icon-btn{
+  border:1px solid var(--line);background:var(--paper-dim);color:var(--ink);
+  font-size:13px;font-weight:700;padding:10px 15px;border-radius:999px;cursor:pointer;
+  display:flex;align-items:center;gap:5px;font-family:'Noto Sans JP',sans-serif;
+  flex-shrink:0;min-height:40px;touch-action:manipulation;white-space:nowrap;
+}
+.icon-btn.due{background:#FFF0E0;border-color:#F0C48A;}
+.icon-btn.due::after{
+  content:attr(data-count);background:var(--c-red);color:#fff;font-size:10px;font-weight:800;
+  border-radius:999px;padding:1px 6px;
+}
+.spacer{flex:1;}
+
+/* ---------- Main area ---------- */
+main{flex:1;position:relative;overflow:hidden;}
+#board{position:absolute;inset:0;overflow:auto;touch-action:none;}
+#boardInner{position:relative;min-width:100%;min-height:100%;will-change:transform;}
+#list{
+  position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:6px 14px 100px;display:none;flex-direction:column;gap:12px;
+}
+.group-label{position:absolute;font-family:'Noto Sans JP',sans-serif;font-weight:700;font-size:14px;color:var(--ink-soft);pointer-events:none;}
+
+/* ---------- Zoom controls ---------- */
+.zoom-controls{
+  position:fixed;left:20px;bottom:24px;display:flex;align-items:center;gap:2px;
+  background:var(--paper);border-radius:999px;box-shadow:0 4px 14px var(--shadow);
+  padding:4px;z-index:60;
+}
+.zoom-controls button{
+  width:32px;height:32px;border-radius:50%;border:none;background:var(--paper-dim);color:var(--ink);
+  font-size:16px;font-weight:700;cursor:pointer;
+}
+.zoom-controls span{font-size:11.5px;font-weight:700;color:var(--ink-soft);width:40px;text-align:center;}
+
+/* ---------- Note card ---------- */
+.note{
+  position:absolute;width:190px;min-height:150px;padding:14px 12px 10px;border-radius:6px;
+  box-shadow:0 5px 12px var(--shadow);cursor:pointer;touch-action:none;
+  transition:box-shadow .15s;user-select:none;-webkit-user-select:none;
+  font-family:'Noto Sans JP',sans-serif;
+}
+.note.note-other{border:1px solid #DCD3C0;}
+.note.dragging{box-shadow:0 14px 26px var(--shadow);z-index:50;transition:none;}
+.note::before{
+  content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%);
+  width:11px;height:11px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #ff7a7a, #b32222 75%);
+  box-shadow:0 2px 3px rgba(0,0,0,0.3);
+}
+.note .subj{font-weight:700;font-size:13.5px;margin-bottom:2px;}
+.note .unit{font-size:10.5px;color:var(--ink-soft);margin-bottom:6px;}
+.note .content{
+  font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;
+  -webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;
+}
+.note .checklist{margin-top:6px;font-size:11px;}
+.note .checklist div{display:flex;align-items:center;gap:4px;margin-bottom:2px;}
+.note .checklist .done{text-decoration:line-through;opacity:0.55;}
+.note .meta-row{position:absolute;bottom:8px;left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;}
+.dots{display:flex;gap:3px;}
+.dots span{width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,0.15);}
+.dots span.on{background:var(--ink);}
+.flag{position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 20px 20px 0;}
+.flag.p3{border-color:transparent var(--c-red) transparent transparent;}
+.flag.p2{border-color:transparent var(--c-orange) transparent transparent;}
+.flag.p1{border-color:transparent transparent transparent transparent;}
+.bell{font-size:13px;}
+.note.list-card{position:relative;width:100%;min-height:auto;display:flex;flex-direction:column;}
+
+/* ---------- FAB ---------- */
+.fab{
+  position:fixed;right:20px;bottom:24px;width:56px;height:56px;border-radius:50%;
+  background:var(--subj-english);color:#5a4a00;font-size:28px;font-weight:700;border:1px solid #EADFA0;
+  box-shadow:0 6px 16px var(--shadow);cursor:pointer;z-index:80;
+}
+
+/* ---------- Dashboard ---------- */
+#dashboard{
+  position:fixed;top:0;right:0;bottom:0;width:min(340px,88vw);background:var(--paper);
+  box-shadow:-6px 0 24px rgba(0,0,0,0.14);padding:18px 18px 24px;overflow-y:auto;
+  transform:translateX(100%);transition:transform .25s ease;z-index:90;
+  font-family:'Noto Sans JP',sans-serif;
+}
+#dashboard.open{transform:translateX(0);}
+#dashboard h2{font-size:18px;font-weight:900;margin:0 0 14px;}
+#dashboard h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin:18px 0 8px;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;}
+.bar-row .label{width:70px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-track{flex:1;height:10px;background:var(--paper-dim);border-radius:6px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:6px;}
+.bar-row .count{width:20px;text-align:right;flex-shrink:0;}
+.due-item{padding:8px 10px;background:var(--paper-dim);border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer;}
+.due-item b{font-weight:700;}
+.close-dash{position:absolute;top:14px;right:14px;border:none;background:transparent;font-size:20px;cursor:pointer;color:var(--ink-soft);}
+.dash-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.2);z-index:85;opacity:0;pointer-events:none;transition:opacity .2s;}
+.dash-overlay.open{opacity:1;pointer-events:auto;}
+.empty-note{font-size:12px;color:var(--ink-soft);}
+
+/* ---------- Modal (shared) ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(30,22,15,0.4);display:flex;align-items:flex-end;justify-content:center;
+  z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-overlay.open{opacity:1;pointer-events:auto;}
+@media(min-width:640px){.modal-overlay{align-items:center;}}
+.modal{
+  background:var(--paper);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;
+  border-radius:16px 16px 0 0;padding:20px 20px 26px;transform:translateY(20px);transition:transform .2s;
+  font-family:'Noto Sans JP',sans-serif;
+}
+@media(min-width:640px){.modal{border-radius:16px;}}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal h2{font-size:18px;font-weight:900;margin:0 0 14px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em;}
+.field input[type=text],.field textarea,.field select{
+  width:100%;padding:9px 10px;border:1px solid #ddd0b8;border-radius:8px;
+  font-family:'Noto Sans JP',sans-serif;font-size:14px;background:#fff;color:var(--ink);
+}
+.field textarea{min-height:80px;resize:vertical;}
+.row2{display:flex;gap:10px;}
+.row2 .field{flex:1;}
+.subject-select-row{display:flex;gap:6px;flex-wrap:wrap;}
+.subject-chip{
+  border:2px solid transparent;border-radius:10px;padding:8px 6px;font-size:12px;font-weight:700;
+  cursor:pointer;flex:1;min-width:64px;text-align:center;color:var(--ink);
+}
+.subject-chip.selected{border-color:var(--ink);}
+.subject-chip.opt-other{border:2px solid #ddd0b8;}
+.checklist-edit .ci{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.checklist-edit .ci input[type=text]{flex:1;padding:7px 9px;font-size:13px;}
+.checklist-edit .ci button{border:none;background:transparent;color:#b3392f;font-size:16px;cursor:pointer;}
+.add-item-btn{border:1px dashed #c7b895;background:transparent;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;color:var(--ink-soft);font-family:'Noto Sans JP',sans-serif;}
+.modal-actions{display:flex;gap:10px;margin-top:18px;}
+.btn{flex:1;border:none;padding:11px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+.btn-primary{background:var(--ink);color:#fff;}
+.btn-secondary{background:var(--paper-dim);color:var(--ink);}
+.btn-danger{background:#fdeaea;color:#a11d1d;flex:0 0 auto;padding:11px 14px;}
+.review-btn{width:100%;margin-top:10px;background:var(--c-green);color:#0b3d1f;border:none;padding:11px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+.return-btn{width:100%;margin-top:8px;background:var(--paper-dim);color:var(--ink);border:1px solid var(--line);padding:11px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+.review-info{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+/* ---------- Detail modal (compact) ---------- */
+.detail-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.d-tag{font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:999px;}
+.d-unit{font-size:12.5px;color:var(--ink-soft);}
+.detail-content{font-size:14.5px;line-height:1.55;white-space:pre-wrap;margin-bottom:14px;padding:10px 12px;background:var(--paper-dim);border-radius:10px;}
+.detail-checklist{margin-bottom:6px;}
+.d-check-row{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px;}
+.d-check-row:last-child{border-bottom:none;}
+.d-check-row .box{width:19px;height:19px;border-radius:5px;border:2px solid #cbbfa4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.d-check-row.done .box{background:var(--ink);border-color:var(--ink);color:#fff;}
+.d-check-row.done span.txt{text-decoration:line-through;color:var(--ink-soft);}
+.d-empty{font-size:12.5px;color:var(--ink-soft);padding:4px;}
+.d-badges{display:flex;gap:6px;margin-bottom:10px;}
+.d-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--paper-dim);color:var(--ink-soft);}
+
+/* ---------- Completed list ---------- */
+.completed-item{display:flex;align-items:center;gap:10px;padding:10px;background:var(--paper-dim);border-radius:10px;margin-bottom:8px;cursor:pointer;}
+.ci-tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;flex-shrink:0;border:1px solid rgba(0,0,0,0.06);}
+.ci-body{flex:1;min-width:0;}
+.ci-unit{font-size:11.5px;color:var(--ink-soft);}
+.ci-content{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ci-return{flex-shrink:0;border:none;background:var(--ink);color:#fff;font-size:11.5px;font-weight:700;padding:8px 10px;border-radius:8px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>📌 Study Board</h1>
+    <p>わからなかったこと・やりたいことを付箋にして貼っていく学習メモ</p>
+  </header>
+
+  <div class="controls">
+    <div class="pill-group" id="viewToggle">
+      <button data-view="board">ボード</button>
+      <button data-view="list">リスト</button>
+    </div>
+    <div class="pill-group" id="sortToggle">
+      <button data-sort="free">自由配置</button>
+      <button data-sort="subject">科目別</button>
+      <button data-sort="unit">単元別</button>
+      <button data-sort="newest">新しい順</button>
+      <button data-sort="priority">優先度順</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="completedBtn">✅ 完了リスト</button>
+    <button class="icon-btn" id="dashBtn">📊 見える化</button>
+  </div>
+
+  <main>
+    <div id="board"><div id="boardInner"></div></div>
+    <div id="list"></div>
+  </main>
+
+  <div class="zoom-controls" id="zoomControls">
+    <button id="zoomOutBtn">－</button>
+    <span id="zoomLabel">100%</span>
+    <button id="zoomInBtn">＋</button>
+  </div>
+
+  <button class="fab" id="addBtn">＋</button>
+</div>
+
+<div class="dash-overlay" id="dashOverlay"></div>
+<div id="dashboard">
+  <button class="close-dash" id="closeDash">✕</button>
+  <h2>見える化ダッシュボード</h2>
+  <h3>科目ごとのメモ数</h3>
+  <div id="subjectBars"></div>
+  <h3>理解度の内訳</h3>
+  <div id="understandBars"></div>
+  <h3>復習すべき項目</h3>
+  <div id="dueList"></div>
+</div>
+
+<!-- 詳細(タップ時のコンパクト表示) -->
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal">
+    <div class="detail-header">
+      <span class="d-tag" id="d-subject-tag"></span>
+      <span class="d-unit" id="d-unit"></span>
+    </div>
+    <div class="d-badges" id="d-badges"></div>
+    <div class="detail-content" id="d-content"></div>
+    <div class="detail-checklist" id="d-checklist"></div>
+    <div class="review-info" id="d-review-info"></div>
+    <button class="review-btn" id="d-review-btn">✅ 今日復習した</button>
+    <button class="return-btn" id="d-return-btn" style="display:none">📌 ボードに戻す</button>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="d-close-btn">閉じる</button>
+      <button class="btn btn-primary" id="d-edit-btn">編集</button>
+    </div>
+  </div>
+</div>
+
+<!-- 編集フォーム -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">新しいメモ</h2>
+    <div class="field">
+      <label>科目</label>
+      <div class="subject-select-row" id="subjectChips"></div>
+    </div>
+    <div class="field">
+      <label>単元</label>
+      <input type="text" id="f-unit" placeholder="例: 二次関数">
+    </div>
+    <div class="field">
+      <label>内容(わからなかったこと・やりたいこと)</label>
+      <textarea id="f-content" placeholder="ここに書く"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>優先度</label>
+        <select id="f-priority">
+          <option value="1">低</option>
+          <option value="2">中</option>
+          <option value="3">高</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>理解度</label>
+        <select id="f-understand">
+          <option value="0">未理解</option>
+          <option value="1">理解中</option>
+          <option value="2">理解済み</option>
+        </select>
+      </div>
+    </div>
+    <div class="field checklist-edit">
+      <label>チェックリスト</label>
+      <div id="checklistItems"></div>
+      <button class="add-item-btn" id="addItemBtn">＋ 項目を追加</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteBtn" style="display:none">削除</button>
+      <button class="btn btn-secondary" id="cancelBtn">キャンセル</button>
+      <button class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 起動時の復習ポップアップ -->
+<div class="modal-overlay" id="reviewPopupOverlay">
+  <div class="modal">
+    <h2>🔔 今日の復習</h2>
+    <p class="empty-note" style="margin-top:-8px;margin-bottom:10px;">タップするとボードに戻って確認できます</p>
+    <div id="reviewPopupList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="reviewPopupClose">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 完了リスト -->
+<div class="modal-overlay" id="completedOverlay">
+  <div class="modal">
+    <h2>✅ 完了リスト</h2>
+    <p class="empty-note" style="margin-top:-8px;margin-bottom:10px;">チェックを全て終えたメモがここに集まります</p>
+    <div id="completedList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="completedCloseBtn">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SUBJECTS = ['数学','英語','物理','化学','その他'];
+  const SUBJECT_COLOR_VAR = {
+    '数学':'subj-math','英語':'subj-english','物理':'subj-physics','化学':'subj-chem','その他':'subj-other'
+  };
+  const INTERVALS = [1,3,7,14,30,60];
+  const ZOOM_MIN=0.5, ZOOM_MAX=2;
+
+  let notes = [];
+  let sortMode = 'free';
+  let viewMode = window.innerWidth < 700 ? 'list' : 'board';
+  let editingId = null;
+  let detailId = null;
+  let zoom = 1;
+
+  const boardEl = document.getElementById('board');
+  const boardInner = document.getElementById('boardInner');
+  const listEl = document.getElementById('list');
+  const zoomControls = document.getElementById('zoomControls');
+
+  function uid(){ return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
+  function rotationFor(id){ return (hashStr(id)%7)-3; }
+  function colorVarFor(subject){ return SUBJECT_COLOR_VAR[subject] || 'subj-other'; }
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function activeNotes(){ return notes.filter(n=>!n.archived); }
+
+  function seedIfEmpty(){
+    if(notes.length) return;
+    const now = Date.now();
+    notes = [
+      {id:uid(), subject:'数学', unit:'二次関数', content:'頂点の求め方(平方完成)がまだあやふや。練習問題をもう少し解く。', priority:3, understanding:0, checklist:[{text:'教科書p42の例題を解く',done:false},{text:'先生に質問する',done:false}], createdAt: now-2*86400000, reviewCount:0, lastReviewed:null, freeX:60, freeY:60, archived:false},
+      {id:uid(), subject:'英語', unit:'仮定法', content:'If I were you 構文の使い方を整理する。過去形と過去完了の使い分けが混同しがち。', priority:2, understanding:1, checklist:[{text:'例文を5個作る',done:true},{text:'練習問題',done:false}], createdAt: now-5*86400000, reviewCount:1, lastReviewed: now-3*86400000, freeX:290, freeY:90, archived:false},
+      {id:uid(), subject:'化学', unit:'物質量(モル)', content:'モル計算の単位換算が苦手。アボガドロ数の使い方を復習する。', priority:1, understanding:2, checklist:[{text:'公式を覚える',done:true}], createdAt: now-10*86400000, reviewCount:2, lastReviewed: now-9*86400000, freeX:120, freeY:320, archived:true}
+    ];
+  }
+
+  // ---------- 永続化 (localStorage) ----------
+  // 実際にiPad等にデプロイして使うことを想定し、ブラウザ標準のlocalStorageを使用しています。
+  // (Claude.aiのチャット内プレビューはサンドボックスの都合でlocalStorageが使えない場合があります。
+  //  その場合はメモリ上でのみ動作し、ページを閉じると内容は消えます。実際にホスティングした環境では問題なく保存されます。)
+  const STORAGE_KEY_NOTES = 'studyboard_notes_v1';
+  const STORAGE_KEY_PREFS = 'studyboard_prefs_v1';
+  let storageAvailable = true;
+  try{
+    localStorage.setItem('__sb_test__','1');
+    localStorage.removeItem('__sb_test__');
+  }catch(e){ storageAvailable = false; }
+
+  let saveTimer=null;
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{
+      if(!storageAvailable) return;
+      try{ localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(notes)); }catch(e){ console.error('save failed', e); }
+    }, 400);
+  }
+  function loadPrefs(){
+    if(!storageAvailable) return;
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY_PREFS);
+      if(raw){ const p=JSON.parse(raw); if(p.sortMode) sortMode=p.sortMode; if(p.viewMode) viewMode=p.viewMode; }
+    }catch(e){}
+  }
+  function savePrefs(){
+    if(!storageAvailable) return;
+    try{ localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({sortMode, viewMode})); }catch(e){}
+  }
+
+  function init(){
+    if(storageAvailable){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY_NOTES);
+        notes = raw ? JSON.parse(raw) : [];
+      }catch(e){ notes = []; }
+    } else {
+      notes = [];
+    }
+    seedIfEmpty();
+    loadPrefs();
+    document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('active', b.dataset.view===viewMode));
+    document.querySelectorAll('#sortToggle button').forEach(b=>b.classList.toggle('active', b.dataset.sort===sortMode));
+    boardEl.style.display = viewMode==='board' ? 'block':'none';
+    listEl.style.display = viewMode==='list' ? 'flex':'none';
+    zoomControls.style.display = viewMode==='board' ? 'flex':'none';
+    initZoomDisplay();
+    render();
+    scheduleSave();
+    showReviewPopupIfNeeded();
+    if(!storageAvailable){
+      console.warn('このプレビュー環境ではlocalStorageが利用できないため、データは保存されません。実際にホスティングした環境では保存されます。');
+    }
+  }
+
+  // ---------- Review / spaced repetition ----------
+  function nextReviewDate(n){
+    const idx = Math.min(n.reviewCount, INTERVALS.length-1);
+    let days = INTERVALS[idx];
+    if(n.understanding===0) days = Math.max(1, Math.floor(days/2));
+    if(n.understanding===2) days = days*2;
+    const base = n.lastReviewed || n.createdAt;
+    return base + days*86400000;
+  }
+  function isDue(n){ return Date.now() >= nextReviewDate(n); }
+
+  function showReviewPopupIfNeeded(){
+    const due = notes.filter(isDue).sort((a,b)=> nextReviewDate(a)-nextReviewDate(b));
+    if(!due.length) return;
+    document.getElementById('reviewPopupList').innerHTML = due.map(n=>`
+      <div class="due-item" data-id="${n.id}"><b>${escapeHtml(n.subject||'その他')}</b> ／ ${escapeHtml(n.unit||'')}<br>${escapeHtml((n.content||'').slice(0,40))}${(n.content||'').length>40?'…':''}</div>
+    `).join('');
+    document.querySelectorAll('#reviewPopupList .due-item').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const n = notes.find(x=>x.id===el.dataset.id);
+        if(n){ n.archived=false; scheduleSave(); render(); }
+        closeReviewPopup();
+        openDetailModal(el.dataset.id);
+      });
+    });
+    document.getElementById('reviewPopupOverlay').classList.add('open');
+  }
+  function closeReviewPopup(){ document.getElementById('reviewPopupOverlay').classList.remove('open'); }
+  document.getElementById('reviewPopupClose').addEventListener('click', closeReviewPopup);
+
+  // ---------- Zoom / Pan ----------
+  // ズームは常に「今見ている/操作している場所」を中心に行う(その画面上の点がズーム前後で動かないように scrollLeft/scrollTop を補正する)
+  function clampZoom(z){ return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z*100)/100)); }
+
+  function initZoomDisplay(){
+    boardInner.style.transform = `scale(${zoom})`;
+    boardInner.style.transformOrigin = '0 0';
+    document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
+  }
+
+  function zoomAtPoint(newZoom, clientX, clientY){
+    newZoom = clampZoom(newZoom);
+    if(newZoom === zoom) return;
+    const rect = boardEl.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    // 現在の画面上の点(px,py)が指しているボード内の論理座標を求める
+    const Lx = (px + boardEl.scrollLeft) / zoom;
+    const Ly = (py + boardEl.scrollTop) / zoom;
+    zoom = newZoom;
+    boardInner.style.transform = `scale(${zoom})`;
+    boardInner.style.transformOrigin = '0 0';
+    document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
+    // ズーム後も同じ論理座標が同じ画面位置(px,py)にくるようスクロール位置を補正
+    boardEl.scrollLeft = Lx*zoom - px;
+    boardEl.scrollTop = Ly*zoom - py;
+  }
+
+  function zoomFromButton(delta){
+    const rect = boardEl.getBoundingClientRect();
+    zoomAtPoint(zoom+delta, rect.left+rect.width/2, rect.top+rect.height/2);
+  }
+  document.getElementById('zoomInBtn').addEventListener('click', ()=> zoomFromButton(0.1));
+  document.getElementById('zoomOutBtn').addEventListener('click', ()=> zoomFromButton(-0.1));
+
+  let activePointers = new Map();
+  let panState = null;
+  let pinchState = null;
+  boardEl.addEventListener('pointerdown', (e)=>{
+    if(e.target.closest('.note')) return;
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(activePointers.size===1){
+      panState = {startX:e.clientX, startY:e.clientY, startScrollLeft:boardEl.scrollLeft, startScrollTop:boardEl.scrollTop};
+    } else if(activePointers.size===2){
+      panState = null;
+      const pts = [...activePointers.values()];
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      pinchState = {startDist: dist||1, startZoom: zoom};
+    }
+  });
+  boardEl.addEventListener('pointermove', (e)=>{
+    if(!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(activePointers.size===2 && pinchState){
+      const pts = [...activePointers.values()];
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const midX = (pts[0].x+pts[1].x)/2;
+      const midY = (pts[0].y+pts[1].y)/2;
+      zoomAtPoint(pinchState.startZoom * (dist/pinchState.startDist), midX, midY);
+    } else if(activePointers.size===1 && panState){
+      const dx = e.clientX - panState.startX;
+      const dy = e.clientY - panState.startY;
+      boardEl.scrollLeft = panState.startScrollLeft - dx;
+      boardEl.scrollTop = panState.startScrollTop - dy;
+    }
+  });
+  function endPointer(e){
+    activePointers.delete(e.pointerId);
+    if(activePointers.size<2) pinchState=null;
+    if(activePointers.size===0) panState=null;
+    else if(activePointers.size===1){
+      const remaining=[...activePointers.entries()][0];
+      panState = {startX:remaining[1].x, startY:remaining[1].y, startScrollLeft:boardEl.scrollLeft, startScrollTop:boardEl.scrollTop};
+    }
+  }
+  boardEl.addEventListener('pointerup', endPointer);
+  boardEl.addEventListener('pointercancel', endPointer);
+  boardEl.addEventListener('pointerleave', endPointer);
+
+  // ---------- Layout ----------
+  function computeLayout(){
+    const containerWidth = boardEl.clientWidth || 900;
+    const colWidth=190, colGap=22, rowHeight=190, rowGap=26;
+    const cols = Math.max(1, Math.floor((containerWidth-40+colGap)/(colWidth+colGap)));
+
+    let sorted = activeNotes();
+    let groupKeyFn = null;
+    if(sortMode==='subject'){
+      sorted.sort((a,b)=> a.subject.localeCompare(b.subject,'ja') || b.createdAt-a.createdAt);
+      groupKeyFn = n=>n.subject||'その他';
+    } else if(sortMode==='unit'){
+      sorted.sort((a,b)=> (a.subject.localeCompare(b.subject,'ja')) || (a.unit||'').localeCompare(b.unit||'','ja') || b.createdAt-a.createdAt);
+      groupKeyFn = n=> (n.subject||'その他') + ' / ' + (n.unit||'未分類');
+    } else if(sortMode==='newest'){
+      sorted.sort((a,b)=> b.createdAt-a.createdAt);
+    } else if(sortMode==='priority'){
+      sorted.sort((a,b)=> b.priority-a.priority || b.createdAt-a.createdAt);
+    }
+
+    const positions = {};
+    const labels = [];
+
+    if(sortMode==='free'){
+      sorted.forEach((n,i)=>{
+        if(n.freeX==null || n.freeY==null){
+          n.freeX = 30 + (i%cols)*(colWidth+colGap);
+          n.freeY = 40 + Math.floor(i/cols)*(rowHeight+rowGap);
+        }
+        positions[n.id] = {x:n.freeX, y:n.freeY};
+      });
+      return {positions, labels, height: Math.max(boardEl.clientHeight, 40+Math.ceil(sorted.length/cols)*(rowHeight+rowGap)+rowHeight), list:sorted};
+    }
+
+    let y=50, col=0, curGroup=undefined;
+    sorted.forEach(n=>{
+      const g = groupKeyFn ? groupKeyFn(n) : null;
+      if(g!==null && g!==curGroup){
+        if(curGroup!==undefined){ y += rowHeight+rowGap; }
+        col=0;
+        labels.push({text:g, x:20, y:y-28});
+        curGroup=g;
+      } else if(col>=cols){
+        col=0; y+=rowHeight+rowGap;
+      }
+      positions[n.id] = {x: 20+col*(colWidth+colGap), y:y};
+      col++;
+    });
+    return {positions, labels, height: y+rowHeight+80, list:sorted};
+  }
+
+  // ---------- Rendering ----------
+  function noteInnerHTML(n){
+    const due = isDue(n);
+    const checklistHtml = (n.checklist||[]).slice(0,4).map(c=>
+      `<div><span>${c.done?'✅':'⬜'}</span><span class="${c.done?'done':''}">${escapeHtml(c.text)}</span></div>`
+    ).join('');
+    const dotsHtml = [0,1,2].map(i=>`<span class="${i<=n.understanding?'on':''}"></span>`).join('');
+    const flagClass = n.priority===3?'p3':(n.priority===2?'p2':'p1');
+    return `
+      <div class="flag ${flagClass}"></div>
+      <div class="subj">${escapeHtml(n.subject||'その他')}</div>
+      <div class="unit">${escapeHtml(n.unit||'')}</div>
+      <div class="content">${escapeHtml(n.content||'')}</div>
+      <div class="checklist">${checklistHtml}</div>
+      <div class="meta-row">
+        <div class="dots">${dotsHtml}</div>
+        <div class="bell">${due?'🔔':''}</div>
+      </div>
+    `;
+  }
+
+  function render(){ if(viewMode==='board') renderBoard(); else renderList(); }
+
+  function renderBoard(){
+    boardInner.innerHTML='';
+    const {positions, labels, height, list} = computeLayout();
+    boardInner.style.height = height+'px';
+    boardInner.style.width = '100%';
+
+    labels.forEach(l=>{
+      const d = document.createElement('div');
+      d.className='group-label';
+      d.style.left = l.x+'px'; d.style.top = l.y+'px';
+      d.textContent = l.text;
+      boardInner.appendChild(d);
+    });
+
+    list.forEach(n=>{
+      const el = document.createElement('div');
+      const colorVar = colorVarFor(n.subject);
+      el.className = 'note' + (colorVar==='subj-other' ? ' note-other' : '');
+      el.dataset.id = n.id;
+      el.style.background = `var(--${colorVar})`;
+      const pos = positions[n.id] || {x:20,y:20};
+      el.style.left = pos.x+'px'; el.style.top = pos.y+'px';
+      el.style.transform = `rotate(${rotationFor(n.id)}deg)`;
+      el.innerHTML = noteInnerHTML(n);
+      attachNoteEvents(el, n, sortMode==='free');
+      boardInner.appendChild(el);
+    });
+  }
+
+  function renderList(){
+    listEl.innerHTML='';
+    let sorted = activeNotes();
+    if(sortMode==='subject'){
+      sorted.sort((a,b)=> a.subject.localeCompare(b.subject,'ja') || b.createdAt-a.createdAt);
+    } else if(sortMode==='unit'){
+      sorted.sort((a,b)=> (a.subject.localeCompare(b.subject,'ja')) || (a.unit||'').localeCompare(b.unit||'','ja') || b.createdAt-a.createdAt);
+    } else if(sortMode==='newest' || sortMode==='free'){
+      sorted.sort((a,b)=> b.createdAt-a.createdAt);
+    } else if(sortMode==='priority'){
+      sorted.sort((a,b)=> b.priority-a.priority || b.createdAt-a.createdAt);
+    }
+    if(!sorted.length){
+      listEl.innerHTML = '<p class="empty-note" style="padding:20px;">まだメモがありません。右下の＋から追加しましょう。</p>';
+      return;
+    }
+    sorted.forEach(n=>{
+      const el = document.createElement('div');
+      const colorVar = colorVarFor(n.subject);
+      el.className = 'note list-card' + (colorVar==='subj-other' ? ' note-other' : '');
+      el.dataset.id = n.id;
+      el.style.background = `var(--${colorVar})`;
+      el.innerHTML = noteInnerHTML(n);
+      attachNoteEvents(el, n, false);
+      listEl.appendChild(el);
+    });
+  }
+
+  function attachNoteEvents(el, note, draggable){
+    if(draggable){ el.addEventListener('pointerdown', (e)=>startDrag(e, el, note)); }
+    else { el.addEventListener('click', ()=> openDetailModal(note.id)); }
+  }
+
+  function startDrag(e, el, note){
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    const startX=e.clientX, startY=e.clientY;
+    const origLeft=parseFloat(el.style.left)||0, origTop=parseFloat(el.style.top)||0;
+    let moved=false;
+    el.classList.add('dragging');
+    function onMove(ev){
+      const rawDx=ev.clientX-startX, rawDy=ev.clientY-startY;
+      if(Math.abs(rawDx)>4||Math.abs(rawDy)>4) moved=true;
+      const dx=rawDx/zoom, dy=rawDy/zoom;
+      el.style.left = (origLeft+dx)+'px'; el.style.top = (origTop+dy)+'px';
+    }
+    function onUp(ev){
+      el.releasePointerCapture(ev.pointerId);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.classList.remove('dragging');
+      if(moved){ note.freeX=parseFloat(el.style.left); note.freeY=parseFloat(el.style.top); scheduleSave(); }
+      else { openDetailModal(note.id); }
+    }
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+  }
+
+  // ---------- Controls ----------
+  document.getElementById('viewToggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    viewMode = btn.dataset.view;
+    document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('active', b===btn));
+    boardEl.style.display = viewMode==='board' ? 'block':'none';
+    listEl.style.display = viewMode==='list' ? 'flex':'none';
+    zoomControls.style.display = viewMode==='board' ? 'flex':'none';
+    savePrefs(); render();
+  });
+  document.getElementById('sortToggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    sortMode = btn.dataset.sort;
+    document.querySelectorAll('#sortToggle button').forEach(b=>b.classList.toggle('active', b===btn));
+    savePrefs(); render();
+  });
+  window.addEventListener('resize', ()=>{ if(viewMode==='board') renderBoard(); });
+
+  // ---------- Dashboard ----------
+  const dashboard = document.getElementById('dashboard');
+  const dashOverlay = document.getElementById('dashOverlay');
+  function openDashboard(){ renderDashboard(); dashboard.classList.add('open'); dashOverlay.classList.add('open'); }
+  function closeDashboard(){ dashboard.classList.remove('open'); dashOverlay.classList.remove('open'); }
+  document.getElementById('dashBtn').addEventListener('click', openDashboard);
+  document.getElementById('closeDash').addEventListener('click', closeDashboard);
+  dashOverlay.addEventListener('click', closeDashboard);
+
+  function renderDashboard(){
+    const bySubject = {};
+    SUBJECTS.forEach(s=> bySubject[s]=0);
+    notes.forEach(n=>{ const s=n.subject||'その他'; bySubject[s]=(bySubject[s]||0)+1; });
+    const maxCount = Math.max(1, ...Object.values(bySubject));
+    document.getElementById('subjectBars').innerHTML = SUBJECTS.map(s=>`
+      <div class="bar-row">
+        <div class="label">${s}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(bySubject[s]/maxCount*100)}%;background:var(--${colorVarFor(s)})"></div></div>
+        <div class="count">${bySubject[s]}</div>
+      </div>`).join('');
+
+    const understandLabels = ['未理解','理解中','理解済み'];
+    const understandColors = ['c-red','c-orange','c-green'];
+    const uCounts = [0,0,0];
+    notes.forEach(n=> uCounts[n.understanding]++);
+    const uMax = Math.max(1, ...uCounts);
+    document.getElementById('understandBars').innerHTML = understandLabels.map((lab,i)=>`
+      <div class="bar-row">
+        <div class="label">${lab}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(uCounts[i]/uMax*100)}%;background:var(--${understandColors[i]})"></div></div>
+        <div class="count">${uCounts[i]}</div>
+      </div>`).join('');
+
+    const due = notes.filter(isDue).sort((a,b)=> nextReviewDate(a)-nextReviewDate(b));
+    document.getElementById('dueList').innerHTML = due.length ? due.map(n=>`
+      <div class="due-item" data-id="${n.id}"><b>${escapeHtml(n.subject||'その他')}</b> ／ ${escapeHtml(n.unit||'')}${n.archived?' (完了リスト)':''}<br>${escapeHtml((n.content||'').slice(0,40))}${(n.content||'').length>40?'…':''}</div>
+    `).join('') : '<p class="empty-note">今復習すべき項目はありません 👍</p>';
+    document.querySelectorAll('#dueList .due-item').forEach(el=>{
+      el.addEventListener('click', ()=>{ closeDashboard(); openDetailModal(el.dataset.id); });
+    });
+
+    const dueBtn = document.getElementById('dashBtn');
+    if(due.length){ dueBtn.classList.add('due'); dueBtn.dataset.count = due.length; }
+    else { dueBtn.classList.remove('due'); dueBtn.removeAttribute('data-count'); }
+  }
+
+  // ---------- Completed list ----------
+  const completedOverlay = document.getElementById('completedOverlay');
+  function openCompletedList(){ renderCompletedList(); completedOverlay.classList.add('open'); }
+  function closeCompletedList(){ completedOverlay.classList.remove('open'); }
+  document.getElementById('completedBtn').addEventListener('click', openCompletedList);
+  document.getElementById('completedCloseBtn').addEventListener('click', closeCompletedList);
+  completedOverlay.addEventListener('click', (e)=>{ if(e.target===completedOverlay) closeCompletedList(); });
+
+  function renderCompletedList(){
+    const archived = notes.filter(n=>n.archived);
+    const box = document.getElementById('completedList');
+    if(!archived.length){ box.innerHTML = '<p class="empty-note">完了したメモはまだありません</p>'; return; }
+    box.innerHTML = archived.map(n=>{
+      const due = isDue(n);
+      return `
+      <div class="completed-item" data-id="${n.id}">
+        <div class="ci-tag" style="background:var(--${colorVarFor(n.subject)})">${escapeHtml(n.subject||'その他')}</div>
+        <div class="ci-body">
+          <div class="ci-unit">${escapeHtml(n.unit||'')}${due?' 🔔':''}</div>
+          <div class="ci-content">${escapeHtml(n.content||'')}</div>
+        </div>
+        <button class="ci-return" data-id="${n.id}">ボードに戻す</button>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.ci-return').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const n = notes.find(x=>x.id===btn.dataset.id);
+        if(n){ n.archived=false; scheduleSave(); render(); renderCompletedList(); }
+      });
+    });
+    box.querySelectorAll('.completed-item').forEach(row=>{
+      row.addEventListener('click', ()=> openDetailModal(row.dataset.id));
+    });
+  }
+
+  // ---------- Detail modal (compact tap view) ----------
+  const detailOverlay = document.getElementById('detailOverlay');
+  function openDetailModal(id){
+    const n = notes.find(x=>x.id===id); if(!n) return;
+    detailId = id;
+    renderDetail(n);
+    detailOverlay.classList.add('open');
+  }
+  function closeDetailModal(){ detailOverlay.classList.remove('open'); }
+  document.getElementById('d-close-btn').addEventListener('click', closeDetailModal);
+  detailOverlay.addEventListener('click', (e)=>{ if(e.target===detailOverlay) closeDetailModal(); });
+
+  function checkAndArchive(n){
+    const allDone = n.checklist && n.checklist.length>0 && n.checklist.every(c=>c.done);
+    n.archived = allDone;
+  }
+
+  function renderDetail(n){
+    const tag = document.getElementById('d-subject-tag');
+    tag.textContent = n.subject||'その他';
+    tag.style.background = `var(--${colorVarFor(n.subject)})`;
+    tag.style.border = colorVarFor(n.subject)==='subj-other' ? '1px solid #DCD3C0' : 'none';
+    document.getElementById('d-unit').textContent = n.unit||'';
+    document.getElementById('d-content').textContent = n.content||'';
+
+    const priorityLabel = n.priority===3?'優先度:高':(n.priority===2?'優先度:中':'優先度:低');
+    const understandLabel = ['理解度:未理解','理解度:理解中','理解度:理解済み'][n.understanding];
+    document.getElementById('d-badges').innerHTML = `<span class="d-badge">${priorityLabel}</span><span class="d-badge">${understandLabel}</span>${n.archived?'<span class="d-badge">✅ 完了リスト</span>':''}`;
+
+    const cl = document.getElementById('d-checklist');
+    if(!n.checklist || !n.checklist.length){
+      cl.innerHTML = '<div class="d-empty">チェックリストなし</div>';
+    } else {
+      cl.innerHTML = n.checklist.map((c,i)=>`
+        <div class="d-check-row ${c.done?'done':''}" data-idx="${i}">
+          <div class="box">${c.done?'✓':''}</div><span class="txt">${escapeHtml(c.text)}</span>
+        </div>`).join('');
+      cl.querySelectorAll('.d-check-row').forEach(row=>{
+        row.addEventListener('click', ()=>{
+          const idx = parseInt(row.dataset.idx,10);
+          n.checklist[idx].done = !n.checklist[idx].done;
+          checkAndArchive(n);
+          scheduleSave();
+          renderDetail(n);
+          render();
+        });
+      });
+    }
+
+    const nd = new Date(nextReviewDate(n));
+    document.getElementById('d-review-info').textContent = `次回の復習目安: ${nd.getMonth()+1}/${nd.getDate()}(復習回数: ${n.reviewCount||0}回)`;
+    document.getElementById('d-return-btn').style.display = n.archived ? 'block' : 'none';
+  }
+
+  document.getElementById('d-review-btn').addEventListener('click', ()=>{
+    if(!detailId) return;
+    const n = notes.find(x=>x.id===detailId); if(!n) return;
+    n.reviewCount = (n.reviewCount||0)+1;
+    n.lastReviewed = Date.now();
+    scheduleSave();
+    renderDetail(n);
+    render();
+  });
+  document.getElementById('d-return-btn').addEventListener('click', ()=>{
+    if(!detailId) return;
+    const n = notes.find(x=>x.id===detailId); if(!n) return;
+    n.archived = false;
+    scheduleSave();
+    renderDetail(n);
+    render();
+  });
+  document.getElementById('d-edit-btn').addEventListener('click', ()=>{
+    if(!detailId) return;
+    const id = detailId;
+    closeDetailModal();
+    openEditModal(id);
+  });
+
+  // ---------- Edit modal ----------
+  const modalOverlay = document.getElementById('modalOverlay');
+  const fUnit = document.getElementById('f-unit');
+  const fContent = document.getElementById('f-content');
+  const fPriority = document.getElementById('f-priority');
+  const fUnderstand = document.getElementById('f-understand');
+  const checklistItems = document.getElementById('checklistItems');
+  const subjectChips = document.getElementById('subjectChips');
+  let selectedSubject = 'その他';
+
+  function renderSubjectChips(){
+    subjectChips.innerHTML = SUBJECTS.map(s=>{
+      const colorVar = colorVarFor(s);
+      const isOther = colorVar==='subj-other';
+      return `<div class="subject-chip ${isOther?'opt-other':''} ${s===selectedSubject?'selected':''}" data-subject="${s}" style="background:var(--${colorVar})">${s}</div>`;
+    }).join('');
+    subjectChips.querySelectorAll('.subject-chip').forEach(chip=>{
+      chip.addEventListener('click', ()=>{ selectedSubject = chip.dataset.subject; renderSubjectChips(); });
+    });
+  }
+
+  function addChecklistRow(text, done){
+    const row = document.createElement('div');
+    row.className='ci';
+    row.innerHTML = `<input type="checkbox" ${done?'checked':''}> <input type="text" value="${escapeHtml(text||'')}" placeholder="項目"> <button type="button">✕</button>`;
+    row.querySelector('button').addEventListener('click', ()=> row.remove());
+    checklistItems.appendChild(row);
+  }
+  document.getElementById('addItemBtn').addEventListener('click', ()=> addChecklistRow('', false));
+
+  function openNewModal(){
+    editingId = null;
+    document.getElementById('modalTitle').textContent = '新しいメモ';
+    selectedSubject = 'その他';
+    fUnit.value=''; fContent.value='';
+    fPriority.value='2'; fUnderstand.value='0';
+    checklistItems.innerHTML='';
+    document.getElementById('deleteBtn').style.display='none';
+    renderSubjectChips();
+    modalOverlay.classList.add('open');
+  }
+
+  function openEditModal(id){
+    const n = notes.find(x=>x.id===id); if(!n) return;
+    editingId = id;
+    document.getElementById('modalTitle').textContent = 'メモを編集';
+    selectedSubject = n.subject || 'その他';
+    fUnit.value = n.unit||'';
+    fContent.value = n.content||'';
+    fPriority.value = String(n.priority||2);
+    fUnderstand.value = String(n.understanding||0);
+    checklistItems.innerHTML='';
+    (n.checklist||[]).forEach(c=> addChecklistRow(c.text, c.done));
+    document.getElementById('deleteBtn').style.display='inline-block';
+    renderSubjectChips();
+    modalOverlay.classList.add('open');
+  }
+
+  function closeModal(){ modalOverlay.classList.remove('open'); }
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e)=>{ if(e.target===modalOverlay) closeModal(); });
+  document.getElementById('addBtn').addEventListener('click', openNewModal);
+
+  document.getElementById('saveBtn').addEventListener('click', ()=>{
+    const subject = selectedSubject || 'その他';
+    const unit = fUnit.value.trim();
+    const content = fContent.value.trim();
+    if(!content){ fContent.focus(); return; }
+    const priority = parseInt(fPriority.value,10);
+    const understanding = parseInt(fUnderstand.value,10);
+    const checklist = [...checklistItems.querySelectorAll('.ci')].map(row=>({
+      text: row.querySelector('input[type=text]').value.trim(),
+      done: row.querySelector('input[type=checkbox]').checked
+    })).filter(c=>c.text);
+    const archived = checklist.length>0 && checklist.every(c=>c.done);
+
+    if(editingId){
+      const n = notes.find(x=>x.id===editingId);
+      Object.assign(n, {subject,unit,content,priority,understanding,checklist,archived});
+    } else {
+      notes.push({id:uid(), subject, unit, content, priority, understanding, checklist, createdAt:Date.now(), reviewCount:0, lastReviewed:null, freeX:null, freeY:null, archived});
+    }
+    scheduleSave(); closeModal(); render();
+  });
+
+  document.getElementById('deleteBtn').addEventListener('click', ()=>{
+    if(!editingId) return;
+    notes = notes.filter(n=>n.id!==editingId);
+    scheduleSave(); closeModal(); render();
+  });
+
+  init();
+})();
+
+// PWA用: Service Workerを登録(オフラインでもアプリを開けるようにする)
+// index.html / manifest.json / sw.js を同じフォルダに置いてホスティングした場合に有効になります。
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* file://で開いた場合などは登録できないため無視 */ });
+  });
+}
+</script>
+</body>
+</html>
